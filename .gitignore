@@ -1,0 +1,4 @@
+/build/
+/.idea/
+CMakeUserPresets.json
+/benchmark/ALL_tsp/

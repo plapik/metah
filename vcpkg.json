@@ -1,0 +1,27 @@
+{
+  "name" : "metah",
+  "version" : "0.1.0",
+  "builtin-baseline" : "cea592f4772491abdb7c483387a59ea89889f4be",
+  "dependencies" : [ {
+    "name" : "fmt",
+    "version>=" : "12.1.0"
+  }, {
+    "name" : "boost-random",
+    "version>=" : "1.91.0"
+  }, {
+    "name" : "abseil",
+    "version>=" : "20260107.1#2"
+  } ],
+  "features" : {
+    "tests" : {
+      "description" : "Dependencies for building tests and examples",
+      "dependencies" : [ {
+        "name" : "doctest",
+        "version>=" : "2.5.2"
+      }, {
+        "name" : "benchmark",
+        "version>=" : "1.9.5"
+      } ]
+    }
+  }
+}
