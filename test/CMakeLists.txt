@@ -4,6 +4,8 @@ list(APPEND CMAKE_MODULE_PATH "${doctest_DIR}")
 add_executable(meta_tests
         test_main.cpp
         test_rng.hpp
+        algorithms/tabu_search.cpp
+        operators/tabu_list.cpp
         operators/permut/swap_mut.cpp
         operators/permut/reverse_mut.cpp
         operators/permut/ox.cpp

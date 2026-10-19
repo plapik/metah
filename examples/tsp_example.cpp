@@ -49,7 +49,8 @@ int main() {
     auto ga_ps = m::PopulationStatsFileLogger<Tsp::ReprType, Tsp::ScoreType>("tsp_ga.csv");
     ga.addLowPrioObserver(&ga_ps);
 
-    m::TabuSearch ts(tsp, 1000, 30, 4, 2, std::make_unique<mp::ReverseNeighbour<Tsp::ReprType>>(30), tsp_random_gen);
+    m::TabuSearch ts(tsp, 1000, m::FifoTabuList<mp::ReverseMove>(30), 4, 2,
+                     std::make_unique<mp::ReverseNeighbour<Tsp::ReprType>>(30), tsp_random_gen);
     auto ta_ss = m::SolutionScoreFileLogger<Tsp::ReprType, Tsp::ScoreType>("tsp_ts.csv");
     ts.addLowPrioObserver(&ta_ss);
 

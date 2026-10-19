@@ -1,21 +1,21 @@
 #ifndef SRC_METAH_ALGORITHMS_TABU_SEARCH_HPP_
 #define SRC_METAH_ALGORITHMS_TABU_SEARCH_HPP_
 
-#include <absl/container/linked_hash_set.h>
 #include <cstddef>
-#include <functional>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <utility>
 #include <vector>
 
+#include "metah/observer.hpp"
 #include "metah/operators/generator.hpp"
 #include "metah/operators/neighbour_gen.hpp"
+#include "metah/operators/tabu_list.hpp"
 #include "metah/optimizer.hpp"
 
 namespace metah {
-template <typename P, typename M, typename Hash = absl::DefaultHashContainerHash<M>, typename Eq = std::equal_to<M>>
-class TabuSearch : public Optimizer<P> {
+template <typename P, typename M, typename T = FifoTabuList<M>> class TabuSearch : public Optimizer<P> {
   public:
     using Base = Optimizer<P>;
     using typename Base::ProblemType;
@@ -23,14 +23,14 @@ class TabuSearch : public Optimizer<P> {
     using typename Base::ScoreType;
     using typename Base::SolutionType;
     using MoveType = M;
+    using TabuListType = T;
 
   private:
     size_t iterations_;
-    size_t tabu_size_;
     size_t threads_;
     size_t chunk_size_;
     std::unique_ptr<NeighbourGen<ReprType, MoveType>> neighbour_gen_;
-    absl::linked_hash_set<MoveType, Hash, Eq> tabu_list_;
+    TabuListType tabu_list_;
     SolutionType current_solution_;
     SolutionType best_solution_;
     std::vector<SolutionObserver<ReprType, ScoreType> *> high_prio_observers_;
@@ -60,17 +60,14 @@ class TabuSearch : public Optimizer<P> {
     }
 
   public:
-    TabuSearch(std::shared_ptr<const ProblemType> evaluator, const uint64_t iterations, const size_t tabu_size,
+    TabuSearch(std::shared_ptr<const ProblemType> evaluator, const uint64_t iterations, TabuListType tabu_list,
                const size_t threads, const size_t chunk_size,
                std::unique_ptr<NeighbourGen<ReprType, MoveType>> neighbour_gen, Generator<ProblemType> &generator)
-        : Base(std::move(evaluator)), iterations_(iterations), tabu_size_(tabu_size), threads_(threads),
-          chunk_size_(chunk_size),
+        : Base(std::move(evaluator)), iterations_(iterations), threads_(threads), chunk_size_(chunk_size),
           neighbour_gen_(neighbour_gen ? std::move(neighbour_gen)
                                        : throw std::invalid_argument("Neighbour generator must not be null")),
-          tabu_list_(tabu_size), current_solution_(generator.generateSolution(this->getProblem())),
-          best_solution_(current_solution_) {
-        tabu_list_.reserve(tabu_size);
-    }
+          tabu_list_(std::move(tabu_list)), current_solution_(generator.generateSolution(this->getProblem())),
+          best_solution_(current_solution_) {}
 
     [[nodiscard]] SolutionType getBest() const override { return best_solution_; }
 
@@ -127,10 +124,7 @@ class TabuSearch : public Optimizer<P> {
                 {
                     if (found_any_global) {
                         current_solution_ = best_neighbour;
-                        if (tabu_list_.size() >= tabu_size_) {
-                            tabu_list_.pop_front();
-                        }
-                        tabu_list_.insert(best_move);
+                        tabu_list_.add(best_move);
                         if (isBetter(current_solution_.score, best_solution_.score)) {
                             best_solution_ = current_solution_;
                         }
@@ -143,31 +137,44 @@ class TabuSearch : public Optimizer<P> {
     }
 };
 
-template <typename ProblemType, typename NeighbourGenType>
-TabuSearch(std::shared_ptr<const ProblemType> evaluator, size_t iterations, size_t tabu_size, size_t threads,
+template <typename ProblemType, typename TabuListType, typename NeighbourGenType>
+TabuSearch(std::shared_ptr<const ProblemType> evaluator, size_t iterations, TabuListType tabu_list, size_t threads,
            size_t chunk_size, std::unique_ptr<NeighbourGenType> neighbour_gen, Generator<ProblemType> &generator)
-    -> TabuSearch<ProblemType, typename NeighbourGenType::MoveType>;
+    -> TabuSearch<ProblemType, typename NeighbourGenType::MoveType, TabuListType>;
 
-template <typename ProblemType, typename NeighbourGenType>
-TabuSearch(std::shared_ptr<ProblemType> evaluator, size_t iterations, size_t tabu_size, size_t threads,
+template <typename ProblemType, typename TabuListType, typename NeighbourGenType>
+TabuSearch(std::shared_ptr<ProblemType> evaluator, size_t iterations, TabuListType tabu_list, size_t threads,
            size_t chunk_size, std::unique_ptr<NeighbourGenType> neighbour_gen, Generator<ProblemType> &generator)
-    -> TabuSearch<ProblemType, typename NeighbourGenType::MoveType>;
+    -> TabuSearch<ProblemType, typename NeighbourGenType::MoveType, TabuListType>;
 
-template <typename P, typename M> class TabuSearchBuilder {
+template <typename P, typename M, typename T = FifoTabuList<M>> class TabuSearchBuilder {
   public:
     using ProblemType = P;
     using ReprType = ProblemType::ReprType;
     using ScoreType = ProblemType::ScoreType;
     using MoveType = M;
+    using TabuListType = T;
 
   private:
     std::shared_ptr<const ProblemType> problem_;
     size_t iterations_ = 100;
-    size_t tabu_size_ = 100;
+    std::optional<TabuListType> tabu_list_;
     size_t threads_ = 1;
     size_t chunk_size_ = 1;
     std::unique_ptr<NeighbourGen<ReprType, MoveType>> neighbour_gen_;
     std::unique_ptr<Generator<ProblemType>> generator_;
+
+    void validate() const {
+        if (!neighbour_gen_) {
+            throw std::invalid_argument("Neighbour generator must be set");
+        }
+        if (!generator_) {
+            throw std::invalid_argument("Generator must be set");
+        }
+        if (!tabu_list_) {
+            throw std::invalid_argument("Tabu list must be set");
+        }
+    }
 
   public:
     explicit TabuSearchBuilder(std::shared_ptr<const ProblemType> p) : problem_(std::move(p)) {}
@@ -182,8 +189,8 @@ template <typename P, typename M> class TabuSearchBuilder {
         return *this;
     }
 
-    TabuSearchBuilder &tabuSize(const size_t tabu_size) {
-        tabu_size_ = tabu_size;
+    TabuSearchBuilder &tabuList(TabuListType tabu_list) {
+        tabu_list_.emplace(std::move(tabu_list));
         return *this;
     }
 
@@ -207,16 +214,18 @@ template <typename P, typename M> class TabuSearchBuilder {
         return *this;
     }
 
-    [[nodiscard]] TabuSearch<ProblemType, MoveType> build() const {
-        if (!neighbour_gen_) {
-            throw std::invalid_argument("Neighbour generator must be set");
-        }
-        if (!generator_) {
-            throw std::invalid_argument("Generator must be set");
-        }
+    [[nodiscard]] TabuSearch<ProblemType, MoveType, TabuListType> build() const & {
+        validate();
 
-        return TabuSearch<ProblemType, MoveType>(problem_, iterations_, tabu_size_, threads_, chunk_size_,
-                                                 neighbour_gen_->clone(), *generator_);
+        return TabuSearch<ProblemType, MoveType, TabuListType>(problem_, iterations_, *tabu_list_, threads_,
+                                                               chunk_size_, neighbour_gen_->clone(), *generator_);
+    }
+
+    [[nodiscard]] TabuSearch<ProblemType, MoveType, TabuListType> build() && {
+        validate();
+
+        return TabuSearch<ProblemType, MoveType, TabuListType>(problem_, iterations_, std::move(*tabu_list_), threads_,
+                                                               chunk_size_, std::move(neighbour_gen_), *generator_);
     }
 };
 } // namespace metah
