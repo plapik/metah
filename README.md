@@ -40,10 +40,10 @@ cmake --workflow --preset release
 
 ### Build options
 
-| Option | Default (top-level) | Meaning |
-|--------|---------------------|---------|
-| `METAH_BUILD_TESTS` | `ON` | Build doctest suite + benchmarks |
-| `METAH_BUILD_EXAMPLES` | `ON` | Build example programs |
+| Option                 | Default (top-level) | Meaning                          |
+|------------------------|---------------------|----------------------------------|
+| `METAH_BUILD_TESTS`    | `ON`                | Build doctest suite + benchmarks |
+| `METAH_BUILD_EXAMPLES` | `ON`                | Build example programs           |
 
 When consumed as a subdirectory or installed package, both default to `OFF`.
 
@@ -61,42 +61,42 @@ target_link_libraries(your_app PRIVATE metah::metah)
 
 ### Requirements
 
-| Component | Requirement |
-|-----------|-------------|
-| Language | C++20 |
-| CMake | ≥ 3.25 |
-| Package manager | vcpkg (manifest mode) |
-| OpenMP | Required (CXX) |
-| Boost.Random | ≥ 1.91 (`xoshiro256pp`) |
-| {fmt} | ≥ 12.1 |
-| Abseil | ≥ 20260107 (`absl::linked_hash_set`) |
+| Component       | Requirement                          |
+|-----------------|--------------------------------------|
+| Language        | C++20                                |
+| CMake           | ≥ 3.25                               |
+| Package manager | vcpkg (manifest mode)                |
+| OpenMP          | Required (CXX)                       |
+| Boost.Random    | ≥ 1.91 (`xoshiro256pp`)              |
+| {fmt}           | ≥ 12.1                               |
+| Abseil          | ≥ 20260107 (`absl::linked_hash_set`) |
 
 **Optional** (vcpkg feature `tests`, enabled by default in presets):
 
-| Component | Requirement |
-|-----------|-------------|
-| doctest | ≥ 2.5.2 |
-| Google Benchmark | ≥ 1.9.5 |
+| Component        | Requirement |
+|------------------|-------------|
+| doctest          | ≥ 2.5.2     |
+| Google Benchmark | ≥ 1.9.5     |
 
 ### Platforms
 
-| Platform | Notes |
-|----------|-------|
-| Windows | Supported |
-| Linux | Supported |
-| macOS | Untested; OpenMP often needs extra setup (e.g. libomp) |
+| Platform | Notes                                                  |
+|----------|--------------------------------------------------------|
+| Windows  | Supported                                              |
+| Linux    | Supported                                              |
+| macOS    | Untested; OpenMP often needs extra setup (e.g. libomp) |
 
 ### Compilers
 
 Needs C++20 with `std::span`, CTAD for standard distributions, and OpenMP
 pragmas used by GA / tabu search.
 
-| Compiler | Expected status |
-|----------|-----------------|
-| GCC 12+ | Supported |
-| Clang 15+ | Supported |
-| MSVC / clang-cl (VS 2022+) | Supported with OpenMP enabled |
-| Apple Clang | Untested; OpenMP usually needs extra setup |
+| Compiler                   | Expected status                            |
+|----------------------------|--------------------------------------------|
+| GCC 12+                    | Supported                                  |
+| Clang 15+                  | Supported                                  |
+| MSVC / clang-cl (VS 2022+) | Supported with OpenMP enabled              |
+| Apple Clang                | Untested; OpenMP usually needs extra setup |
 
 ### Known limitations
 

@@ -57,14 +57,24 @@
     {
       "name": "debug",
       "configurePreset": "debug",
-      "output": {"outputOnFailure": true},
-      "execution": {"noTestsAction": "error", "stopOnFailure": true}
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error",
+        "stopOnFailure": true
+      }
     },
     {
       "name": "release",
       "configurePreset": "release",
-      "output": {"outputOnFailure": true},
-      "execution": {"noTestsAction": "error", "stopOnFailure": true}
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error",
+        "stopOnFailure": true
+      }
     }
   ],
   "workflowPresets": [
@@ -72,18 +82,36 @@
       "name": "debug",
       "displayName": "Configure, Build, and Test (Debug)",
       "steps": [
-        { "type": "configure", "name": "debug" },
-        { "type": "build", "name": "debug" },
-        { "type": "test", "name": "debug" }
+        {
+          "type": "configure",
+          "name": "debug"
+        },
+        {
+          "type": "build",
+          "name": "debug"
+        },
+        {
+          "type": "test",
+          "name": "debug"
+        }
       ]
     },
     {
       "name": "release",
       "displayName": "Configure, Build, and Test (Release)",
       "steps": [
-        { "type": "configure", "name": "release" },
-        { "type": "build", "name": "release" },
-        { "type": "test", "name": "release" }
+        {
+          "type": "configure",
+          "name": "release"
+        },
+        {
+          "type": "build",
+          "name": "release"
+        },
+        {
+          "type": "test",
+          "name": "release"
+        }
       ]
     }
   ]

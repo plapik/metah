@@ -11,15 +11,15 @@ message(STATUS "metah: Building examples -> ${METAH_BUILD_EXAMPLES}")
 
 add_subdirectory(src)
 
-if(METAH_BUILD_TESTS)
+if (METAH_BUILD_TESTS)
     enable_testing()
     add_subdirectory(test)
     add_subdirectory(bench)
-endif()
+endif ()
 
-if(METAH_BUILD_EXAMPLES)
+if (METAH_BUILD_EXAMPLES)
     add_subdirectory(examples)
-endif()
+endif ()
 
 install(EXPORT metah_Targets
         FILE metahTargets.cmake

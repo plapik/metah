@@ -1,10 +1,8 @@
+#include <doctest/doctest.h>
 #include <vector>
 
-#include <doctest/doctest.h>
-
-#include <metah/operators/binary/single_point_cross.hpp>
-
 #include "test_rng.hpp"
+#include <metah/operators/binary/single_point_cross.hpp>
 
 TEST_SUITE_BEGIN("Binary operators");
 
@@ -12,9 +10,8 @@ TEST_CASE("SinglePointCrossover standard success") {
     size_t bitset_size = 20;
     size_t split_point = 8;
 
-    std::vector<uint8_t> p1_zeros(bitset_size), p2_ones(bitset_size, 1),
-                          c1(bitset_size), c2(bitset_size),
-                          expected_c1(bitset_size), expected_c2(bitset_size);
+    std::vector<uint8_t> p1_zeros(bitset_size), p2_ones(bitset_size, 1), c1(bitset_size), c2(bitset_size),
+        expected_c1(bitset_size), expected_c2(bitset_size);
 
     for (size_t i = split_point; i < expected_c1.size(); ++i) {
         expected_c1[i] = 1;

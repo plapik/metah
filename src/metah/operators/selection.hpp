@@ -5,14 +5,13 @@
 #include <span>
 
 namespace metah {
-template <typename S>
-class Selection {
- public:
-  using ScoreType = S;
-  virtual size_t select(std::span<const ScoreType> scores) = 0;
-  [[nodiscard]] virtual std::unique_ptr<Selection> clone() const = 0;
-  virtual ~Selection() = default;
+template <typename S> class Selection {
+  public:
+    using ScoreType = S;
+    virtual size_t select(std::span<const ScoreType> scores) = 0;
+    [[nodiscard]] virtual std::unique_ptr<Selection> clone() const = 0;
+    virtual ~Selection() = default;
 };
-}  // namespace metah
+} // namespace metah
 
-#endif  // SRC_METAH_OPERATORS_SELECTION_HPP_
+#endif // SRC_METAH_OPERATORS_SELECTION_HPP_
