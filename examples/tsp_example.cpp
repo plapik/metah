@@ -9,6 +9,8 @@
 #include <metah/algorithms/tabu_search.hpp>
 #include <metah/observers/population_stats_logger.hpp>
 #include <metah/observers/solution_score_logger.hpp>
+#include <metah/operators/geometric_cooling.hpp>
+#include <metah/operators/metropolis_acceptance.hpp>
 #include <metah/operators/permut/pmx.hpp>
 #include <metah/operators/permut/reverse_mut.hpp>
 #include <metah/operators/permut/reverse_nbr.hpp>

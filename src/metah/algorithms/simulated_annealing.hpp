@@ -1,82 +1,21 @@
 #ifndef SRC_METAH_ALGORITHMS_SIMULATED_ANNEALING_HPP_
 #define SRC_METAH_ALGORITHMS_SIMULATED_ANNEALING_HPP_
 
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <stdexcept>
+#include <utility>
 #include <vector>
 
 #include "metah/observer.hpp"
+#include "metah/operators/acceptance_strategy.hpp"
+#include "metah/operators/cooling_schema.hpp"
 #include "metah/operators/generator.hpp"
 #include "metah/operators/perturbation.hpp"
 #include "metah/optimizer.hpp"
-#include "metah/util/rng.hpp"
 
 namespace metah {
-template <typename S> class AcceptanceStrategy {
-  public:
-    using ScoreType = S;
-    virtual bool shouldAccept(const ScoreType &current_score, const ScoreType &neighbour_score,
-                              double temperature) const = 0;
-    [[nodiscard]] virtual std::unique_ptr<AcceptanceStrategy> clone() const = 0;
-    virtual ~AcceptanceStrategy() = default;
-};
-
-template <typename S, bool isMinimizing, typename RNG = ThreadLocalRandom>
-class MetropolisAcceptance final : public AcceptanceStrategy<S> {
-    [[no_unique_address]] RNG rng_;
-
-  public:
-    using ScoreType = S;
-    explicit MetropolisAcceptance(RNG rng = RNG()) : rng_(std::move(rng)) {}
-
-    bool shouldAccept(const ScoreType &current_score, const ScoreType &neighbour_score,
-                      const double temperature) const override {
-        if (temperature <= 0.0) {
-            return false;
-        }
-
-        double delta;
-        if constexpr (isMinimizing) {
-            delta = static_cast<double>(current_score) - static_cast<double>(neighbour_score);
-        } else {
-            delta = static_cast<double>(neighbour_score) - static_cast<double>(current_score);
-        }
-
-        return std::exp(delta / temperature) > rng_.random01();
-    }
-
-    [[nodiscard]] std::unique_ptr<AcceptanceStrategy<S>> clone() const override {
-        return std::make_unique<MetropolisAcceptance>(*this);
-    }
-};
-
-class CoolingSchema {
-  public:
-    [[nodiscard]] virtual double newTemperature(double current_temperature, size_t iteration) const = 0;
-    [[nodiscard]] virtual std::unique_ptr<CoolingSchema> clone() const = 0;
-    virtual ~CoolingSchema() = default;
-};
-
-class GeometricCooling final : public CoolingSchema {
-    double alpha_;
-
-  public:
-    explicit GeometricCooling(const double alpha) : alpha_(alpha) {
-        if (alpha <= 0.0 || alpha >= 1.0) {
-            throw std::invalid_argument("Alpha must be strictly between 0.0 "
-                                        "and 1.0 for Geometric Cooling.");
-        }
-    }
-
-    [[nodiscard]] double newTemperature(const double current_temperature, size_t iteration) const override {
-        return current_temperature * alpha_;
-    }
-
-    [[nodiscard]] std::unique_ptr<CoolingSchema> clone() const override {
-        return std::make_unique<GeometricCooling>(*this);
-    }
-};
-
 template <typename P> class SimulatedAnnealing final : public Optimizer<P> {
   public:
     using Base = Optimizer<P>;
