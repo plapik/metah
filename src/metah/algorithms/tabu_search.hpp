@@ -47,13 +47,13 @@ class TabuSearch : public Optimizer<P> {
     void notifyObservers(size_t iteration = 0) {
         if (!high_prio_observers_.empty()) {
 #pragma omp for schedule(dynamic)
-            for (size_t j = 0; j < high_prio_observers_.size(); ++j) {
+            for (std::ptrdiff_t j = 0; j < static_cast<std::ptrdiff_t>(high_prio_observers_.size()); ++j) {
                 high_prio_observers_[j]->update(iteration, current_solution_);
             }
         }
         if (!low_prio_observers_.empty()) {
 #pragma omp for schedule(dynamic) nowait
-            for (size_t j = 0; j < low_prio_observers_.size(); ++j) {
+            for (std::ptrdiff_t j = 0; j < static_cast<std::ptrdiff_t>(low_prio_observers_.size()); ++j) {
                 low_prio_observers_[j]->update(iteration, current_solution_);
             }
         }
@@ -96,7 +96,8 @@ class TabuSearch : public Optimizer<P> {
             for (size_t i = 1; i <= iterations_; ++i) {
                 bool found_any_local = false;
 #pragma omp for schedule(dynamic, chunk_size_) nowait
-                for (size_t j = 0; j < neighbour_gen_->size(current_solution_.repr); ++j) {
+                for (std::ptrdiff_t j = 0;
+                     j < static_cast<std::ptrdiff_t>(neighbour_gen_->size(current_solution_.repr)); ++j) {
                     const MoveType move = neighbour_gen_->generate(current_solution_.repr, neighbour_solution.repr, j);
                     neighbour_solution.score = this->getProblem().evaluate(neighbour_solution.repr);
 

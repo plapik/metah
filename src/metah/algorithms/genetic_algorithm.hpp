@@ -1,6 +1,7 @@
 #ifndef SRC_METAH_ALGORITHMS_GENETIC_ALGORITHM_HPP_
 #define SRC_METAH_ALGORITHMS_GENETIC_ALGORITHM_HPP_
 
+#include <cstddef>
 #include <memory>
 #include <utility>
 #include <vector>
@@ -73,13 +74,13 @@ template <typename P> class GeneticAlgorithm final : public Optimizer<P> {
     void notifyObservers(uint64_t iteration = 0) {
         if (!high_prio_observers_.empty()) {
 #pragma omp for schedule(dynamic)
-            for (size_t j = 0; j < high_prio_observers_.size(); ++j) {
+            for (std::ptrdiff_t j = 0; j < static_cast<std::ptrdiff_t>(high_prio_observers_.size()); ++j) {
                 high_prio_observers_[j]->update(iteration, population_, scores_);
             }
         }
         if (!low_prio_observers_.empty()) {
 #pragma omp for schedule(dynamic) nowait
-            for (size_t j = 0; j < low_prio_observers_.size(); ++j) {
+            for (std::ptrdiff_t j = 0; j < static_cast<std::ptrdiff_t>(low_prio_observers_.size()); ++j) {
                 low_prio_observers_[j]->update(iteration, population_, scores_);
             }
         }
@@ -122,7 +123,7 @@ template <typename P> class GeneticAlgorithm final : public Optimizer<P> {
             notifyObservers();
             for (uint64_t i = 1; i <= generations_; ++i) {
 #pragma omp for schedule(dynamic, chunk_size_)
-                for (size_t j = 0; j < population_size_; j += 2) {
+                for (std::ptrdiff_t j = 0; j < static_cast<std::ptrdiff_t>(population_size_); j += 2) {
                     const auto idx1 = select_->select(scores_);
                     const auto idx2 = select_->select(scores_);
                     auto &child1 = next_pop[j];

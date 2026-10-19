@@ -24,7 +24,3 @@ target_link_libraries(metah_benchmark
 target_include_directories(metah_benchmark PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/microbenchmarks/operators
 )
-
-if (MSVC AND CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-    target_compile_options(metah_benchmark PRIVATE /openmp:llvm)
-endif ()
