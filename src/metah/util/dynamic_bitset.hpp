@@ -44,6 +44,30 @@ template <typename Block = uint64_t, typename Allocator = std::allocator<Block>>
     size_t num_blocks_;
     Block *blocks_;
 
+    void release() noexcept {
+        if (blocks_) {
+            AllocTraits::deallocate(alloc_, blocks_, num_blocks_);
+        }
+        num_bits_ = 0;
+        num_blocks_ = 0;
+        blocks_ = nullptr;
+    }
+
+    void swapStorage(DynamicBitset &other) noexcept {
+        using std::swap;
+        swap(num_bits_, other.num_bits_);
+        swap(num_blocks_, other.num_blocks_);
+        swap(blocks_, other.blocks_);
+    }
+
+    DynamicBitset(const DynamicBitset &other, const Allocator &alloc)
+        : alloc_(alloc), num_bits_(other.num_bits_), num_blocks_(other.num_blocks_), blocks_(nullptr) {
+        if (num_blocks_ > 0) {
+            blocks_ = AllocTraits::allocate(alloc_, num_blocks_);
+            std::copy_n(other.blocks_, num_blocks_, blocks_);
+        }
+    }
+
   public:
     class reference {
         DynamicBitset &bitset_;
@@ -77,56 +101,49 @@ template <typename Block = uint64_t, typename Allocator = std::allocator<Block>>
         }
     }
 
-    ~DynamicBitset() {
-        if (blocks_) {
-            AllocTraits::deallocate(alloc_, blocks_, num_blocks_);
-        }
-    }
+    ~DynamicBitset() { release(); }
 
     DynamicBitset(const DynamicBitset &other)
-        : alloc_(AllocTraits::select_on_container_copy_construction(other.alloc_)), num_bits_(other.num_bits_),
-          num_blocks_(other.num_blocks_), blocks_(nullptr) {
-        if (num_blocks_ > 0) {
-            blocks_ = AllocTraits::allocate(alloc_, num_blocks_);
-            std::copy_n(other.blocks_, num_blocks_, blocks_);
-        }
-    }
+        : DynamicBitset(other, AllocTraits::select_on_container_copy_construction(other.alloc_)) {}
 
-    DynamicBitset(DynamicBitset &&other) noexcept
+    DynamicBitset(DynamicBitset &&other) noexcept(std::is_nothrow_move_constructible_v<Allocator>)
         : alloc_(std::move(other.alloc_)), num_bits_(std::exchange(other.num_bits_, 0)),
           num_blocks_(std::exchange(other.num_blocks_, 0)), blocks_(std::exchange(other.blocks_, nullptr)) {}
 
     DynamicBitset &operator=(const DynamicBitset &other) {
         if (this != &other) {
-            if (blocks_) {
-                AllocTraits::deallocate(alloc_, blocks_, num_blocks_);
-            }
             if constexpr (AllocTraits::propagate_on_container_copy_assignment::value) {
+                DynamicBitset replacement(other, other.alloc_);
+                release();
                 alloc_ = other.alloc_;
-            }
-            num_bits_ = other.num_bits_;
-            num_blocks_ = other.num_blocks_;
-            if (num_blocks_ > 0) {
-                blocks_ = AllocTraits::allocate(alloc_, num_blocks_);
-                std::copy_n(other.blocks_, num_blocks_, blocks_);
+                swapStorage(replacement);
             } else {
-                blocks_ = nullptr;
+                DynamicBitset replacement(other, alloc_);
+                swapStorage(replacement);
             }
         }
         return *this;
     }
 
-    DynamicBitset &operator=(DynamicBitset &&other) noexcept {
+    DynamicBitset &operator=(DynamicBitset &&other) noexcept(AllocTraits::propagate_on_container_move_assignment::value
+                                                                 ? std::is_nothrow_move_assignable_v<Allocator>
+                                                                 : AllocTraits::is_always_equal::value) {
         if (this != &other) {
-            if (blocks_) {
-                AllocTraits::deallocate(alloc_, blocks_, num_blocks_);
-            }
             if constexpr (AllocTraits::propagate_on_container_move_assignment::value) {
+                release();
                 alloc_ = std::move(other.alloc_);
+                swapStorage(other);
+            } else if constexpr (AllocTraits::is_always_equal::value) {
+                release();
+                swapStorage(other);
+            } else if (alloc_ == other.alloc_) {
+                release();
+                swapStorage(other);
+            } else {
+                DynamicBitset replacement(other, alloc_);
+                swapStorage(replacement);
+                other.release();
             }
-            num_bits_ = std::exchange(other.num_bits_, 0);
-            num_blocks_ = std::exchange(other.num_blocks_, 0);
-            blocks_ = std::exchange(other.blocks_, nullptr);
         }
         return *this;
     }

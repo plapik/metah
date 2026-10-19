@@ -22,6 +22,7 @@ add_executable(meta_tests
         operators/binary/flip_nbr.cpp
         operators/binary/flip_perturbation.cpp
         util/dynamic_bitset.cpp
+        util/dynamic_bitset_alloc.cpp
 )
 
 target_include_directories(meta_tests PRIVATE
