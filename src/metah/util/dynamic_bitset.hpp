@@ -13,6 +13,18 @@
 // Experimental, implementation partially made by AI
 
 namespace metah {
+/**
+ * @brief A bit sequence with a size chosen at construction and independent copy storage.
+ * @tparam Block Unsigned integer storage type with a power-of-two bit width.
+ * @tparam Allocator Allocator for Block values using raw pointers.
+ *
+ * Bit indices must be below size(); nonempty ranges must fit within size().
+ * Bounds are checked by assertions only. Bit zero is the least significant bit
+ * of the first block.
+ *
+ * @note Concurrent reads are safe without concurrent writes. Modifications to
+ * the same instance require synchronization, even when accessing different bits.
+ */
 template <typename Block = uint64_t, typename Allocator = std::allocator<Block>> class DynamicBitset {
     static_assert(std::is_unsigned_v<Block>, "Block type must be an unsigned integer");
 
@@ -27,8 +39,10 @@ template <typename Block = uint64_t, typename Allocator = std::allocator<Block>>
     static constexpr size_t bitIndex(const size_t pos) noexcept { return pos & BLOCK_MASK; }
     static constexpr size_t calcNumBlocks(const size_t bits) noexcept { return (bits + BLOCK_MASK) >> BLOCK_SHIFT; }
 
+    /// @brief Returns the number of bits in a partial final block, or zero for full blocks.
     [[nodiscard]] size_t lastBlockBits() const noexcept { return num_bits_ & BLOCK_MASK; }
 
+    /// @brief Clears unused bits in the final storage block.
     void sanitize() noexcept {
         size_t extra = lastBlockBits();
         if (extra > 0 && num_blocks_ > 0) {
@@ -69,6 +83,7 @@ template <typename Block = uint64_t, typename Allocator = std::allocator<Block>>
     }
 
   public:
+    /// @brief Writable bit proxy; accesses the bitset rather than owning a separate value.
     class reference {
         DynamicBitset &bitset_;
         size_t pos_;
@@ -93,6 +108,7 @@ template <typename Block = uint64_t, typename Allocator = std::allocator<Block>>
         }
     };
 
+    /// @brief Creates a zero-initialized bitset of the requested size; allocation failures propagate.
     explicit DynamicBitset(const size_t bits, const Allocator &alloc = Allocator())
         : alloc_(alloc), num_bits_(bits), num_blocks_(calcNumBlocks(bits)), blocks_(nullptr) {
         if (num_blocks_ > 0) {
@@ -103,13 +119,16 @@ template <typename Block = uint64_t, typename Allocator = std::allocator<Block>>
 
     ~DynamicBitset() { release(); }
 
+    /// @brief Deep-copies using the allocator selected for copy construction.
     DynamicBitset(const DynamicBitset &other)
         : DynamicBitset(other, AllocTraits::select_on_container_copy_construction(other.alloc_)) {}
 
+    /// @brief Transfers storage and leaves other empty.
     DynamicBitset(DynamicBitset &&other) noexcept(std::is_nothrow_move_constructible_v<Allocator>)
         : alloc_(std::move(other.alloc_)), num_bits_(std::exchange(other.num_bits_, 0)),
           num_blocks_(std::exchange(other.num_blocks_, 0)), blocks_(std::exchange(other.blocks_, nullptr)) {}
 
+    /// @brief Deep-copies with allocator propagation; allocation failure leaves both operands unchanged.
     DynamicBitset &operator=(const DynamicBitset &other) {
         if (this != &other) {
             if constexpr (AllocTraits::propagate_on_container_copy_assignment::value) {
@@ -125,6 +144,11 @@ template <typename Block = uint64_t, typename Allocator = std::allocator<Block>>
         return *this;
     }
 
+    /**
+     * @brief Moves the value and leaves other empty unless assigning to itself.
+     * Unequal non-propagating allocators require allocation, whose failure leaves
+     * both operands unchanged.
+     */
     DynamicBitset &operator=(DynamicBitset &&other) noexcept(AllocTraits::propagate_on_container_move_assignment::value
                                                                  ? std::is_nothrow_move_assignable_v<Allocator>
                                                                  : AllocTraits::is_always_equal::value) {
@@ -151,9 +175,12 @@ template <typename Block = uint64_t, typename Allocator = std::allocator<Block>>
     [[nodiscard]] size_t size() const noexcept { return num_bits_; }
     [[nodiscard]] size_t num_blocks() const noexcept { return num_blocks_; }
 
+    /// @brief Returns mutable block storage. Restore padding bits with sanitize() after raw writes.
     Block *data() noexcept { return blocks_; }
+    /// @brief Returns read-only block storage. Assignment or moving storage may invalidate the pointer.
     const Block *data() const noexcept { return blocks_; }
 
+    /// @brief Reads the bit at pos; requires pos < size().
     [[nodiscard]] bool test(const size_t pos) const noexcept {
         assert(pos < num_bits_ && "Bit position out of range");
         return blocks_[blockIndex(pos)] >> bitIndex(pos) & 1;
@@ -174,7 +201,7 @@ template <typename Block = uint64_t, typename Allocator = std::allocator<Block>>
         blocks_[blockIndex(pos)] ^= Block(1) << bitIndex(pos);
     }
 
-    // --- Range Bit Operations ---
+    /// @brief Sets the length bits starting at startpos; a zero length does nothing.
     void set(const size_t startpos, const size_t length) noexcept {
         if (length == 0) {
             return;
@@ -200,6 +227,7 @@ template <typename Block = uint64_t, typename Allocator = std::allocator<Block>>
         }
     }
 
+    /// @brief Clears the length bits starting at startpos; a zero length does nothing.
     void reset(const size_t startpos, const size_t length) noexcept {
         if (length == 0) {
             return;
@@ -225,6 +253,7 @@ template <typename Block = uint64_t, typename Allocator = std::allocator<Block>>
         }
     }
 
+    /// @brief Toggles the length bits starting at startpos; a zero length does nothing.
     void flip(const size_t startpos, const size_t length) noexcept {
         if (length == 0) {
             return;
@@ -261,6 +290,7 @@ template <typename Block = uint64_t, typename Allocator = std::allocator<Block>>
         sanitize();
     }
 
+    /// @brief Counts set bits in O(num_blocks()) time.
     [[nodiscard]] size_t count() const noexcept {
         size_t c = 0;
         for (size_t i = 0; i < num_blocks_; ++i) {
@@ -269,6 +299,7 @@ template <typename Block = uint64_t, typename Allocator = std::allocator<Block>>
         return c;
     }
 
+    /// @brief Returns whether every bit is set; true for an empty bitset.
     [[nodiscard]] bool all() const noexcept {
         if (num_bits_ == 0) {
             return true;
@@ -301,9 +332,11 @@ template <typename Block = uint64_t, typename Allocator = std::allocator<Block>>
 
     [[nodiscard]] bool none() const noexcept { return !any(); }
 
+    /// @brief Returns a writable bit proxy; requires pos < size().
     reference operator[](size_t pos) noexcept { return reference(*this, pos); }
     bool operator[](const size_t pos) const noexcept { return test(pos); }
 
+    /// @brief ANDs overlapping blocks, leaving unmatched blocks and the size unchanged.
     DynamicBitset &operator&=(const DynamicBitset &other) noexcept {
         const size_t n = std::min(num_blocks_, other.num_blocks_);
         for (size_t i = 0; i < n; ++i) {
@@ -312,6 +345,7 @@ template <typename Block = uint64_t, typename Allocator = std::allocator<Block>>
         return *this;
     }
 
+    /// @brief ORs overlapping blocks, leaving unmatched blocks and the size unchanged.
     DynamicBitset &operator|=(const DynamicBitset &other) noexcept {
         const size_t n = std::min(num_blocks_, other.num_blocks_);
         for (size_t i = 0; i < n; ++i) {
@@ -320,6 +354,7 @@ template <typename Block = uint64_t, typename Allocator = std::allocator<Block>>
         return *this;
     }
 
+    /// @brief XORs overlapping blocks, leaving unmatched blocks and the size unchanged.
     DynamicBitset &operator^=(const DynamicBitset &other) noexcept {
         const size_t n = std::min(num_blocks_, other.num_blocks_);
         for (size_t i = 0; i < n; ++i) {
@@ -334,6 +369,7 @@ template <typename Block = uint64_t, typename Allocator = std::allocator<Block>>
         return res;
     }
 
+    /// @brief Shifts toward higher indices, filling with zeros; shift >= size() clears all bits.
     DynamicBitset &operator<<=(const size_t shift) noexcept {
         if (shift >= num_bits_) {
             reset();
@@ -363,6 +399,7 @@ template <typename Block = uint64_t, typename Allocator = std::allocator<Block>>
         return *this;
     }
 
+    /// @brief Shifts toward lower indices, filling with zeros; shift >= size() clears all bits.
     DynamicBitset &operator>>=(const size_t shift) noexcept {
         if (shift >= num_bits_) {
             reset();

@@ -57,6 +57,18 @@ target_link_libraries(your_app PRIVATE metah::metah)
 `metah::metah` is an INTERFACE target. Linking it propagates C++20, includes
 (`#include <metah/...>`), OpenMP, Boost.Random, {fmt}, and Abseil.
 
+## Documentation
+
+Install Doxygen and make sure `doxygen` is available on your `PATH`. From the
+repository root, run:
+
+```bash
+doxygen Doxyfile
+```
+
+Open `build/docs/html/index.html` in a browser to view the generated documentation.
+The binary and permutation operator overviews are listed under Topics.
+
 ## Compatibility
 
 ### Requirements

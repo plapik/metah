@@ -1,0 +1,45 @@
+/**
+ * @defgroup binary_operators Binary operators
+ * @brief Crossover, mutation, neighborhood generation, and perturbation for binary representations.
+ *
+ * @par Representation requirements
+ * Element-wise operators use representations whose elements are zero or one.
+ * Flipping requires std::size(), operator[], and assignment of an element XOR 1.
+ * Neighbor and perturbation operators additionally use empty() and representation
+ * copy assignment. SinglePointCrossover also requires std::begin(), std::end(),
+ * and random-access iterators. Typical representations include std::vector<uint8_t>,
+ * std::vector<bool>, std::array, and std::deque, subject to the selected operator's
+ * requirements; contiguous storage is not generally required.
+ *
+ * BitsetSinglePointCrossover operates on packed unsigned blocks. Its representation
+ * must provide size(), num_blocks(), data(), blockIndex(), and bitIndex(), with
+ * compatible block layouts. metah::DynamicBitset provides this interface.
+ *
+ * @par Input and output requirements
+ * Flip operations require a nonempty representation; crossover requires at least
+ * two bits. Output references must point to initialized, independent representations
+ * of the same size as their inputs, with distinct outputs for crossover. For
+ * example, vectors must already be resized. Operators need not allocate or resize
+ * outputs. Copies must not alias the inputs' underlying storage.
+ *
+ * @par Probabilities and moves
+ * Crossover probabilities must be in [0, 1]. Per-bit flip operators change each
+ * bit independently, using geometric gaps to skip unselected bits. A probability
+ * <= 0 changes no bits; >= 1 flips every bit. Use finite probability values.
+ * Single-flip operators always flip exactly one random bit. Multi-bit sampling
+ * can leave the representation unchanged and produce an empty move.
+ *
+ * @par Randomness and concurrency
+ * RNG must provide the sampling functions used by the selected operator.
+ * It must be copy-constructible because cloning an operator copies its stored RNG;
+ * the RNG itself does not need a clone() method. Constructors initialize the RNG
+ * from an rvalue, using a move constructor if available or a copy constructor
+ * otherwise. Default construction is required only when no RNG instance is supplied.
+ * Concurrent calls require a thread-safe RNG, such as metah::ThreadLocalRandom.
+ * Each call must use independent output storage.
+ */
+
+/**
+ * @dir src/metah/operators/binary
+ * @brief Binary operators; see @ref binary_operators for shared requirements.
+ */

@@ -10,6 +10,10 @@
 #include "metah/util/rng.hpp"
 
 namespace metah::permut {
+/**
+ * @brief Moves a randomly chosen later element to an earlier position, shifting intervening elements right.
+ * @ingroup permutation_operators
+ */
 template <typename R = std::vector<size_t>, typename RNG = ThreadLocalRandom> class Insert final : public Mutate<R> {
     [[no_unique_address]] RNG rng_;
     double chance_;
@@ -18,11 +22,13 @@ template <typename R = std::vector<size_t>, typename RNG = ThreadLocalRandom> cl
     using Base = Mutate<R>;
     using typename Base::ReprType;
 
+    /// @brief Creates an insertion mutation; requires chance in (0, 1], checked by assertions.
     explicit Insert(const double chance, RNG rng = RNG()) : rng_(std::move(rng)), chance_(chance) {
         assert(chance > 0);
         assert(chance <= 1);
     }
 
+    /// @brief Applies insertion with the configured probability; returns whether it was applied.
     bool mutate(ReprType &repr) override {
         assert(std::size(repr) >= 2);
         if (!rng_.randomBool(chance_)) {

@@ -9,6 +9,12 @@
 #include "metah/util/rng.hpp"
 
 namespace metah {
+/**
+ * @brief Metropolis acceptance based on score difference and temperature.
+ * @tparam S Score type convertible to double.
+ * @tparam isMinimizing Optimization direction; must match the problem.
+ * @tparam RNG Random source providing random01() in [0, 1).
+ */
 template <typename S, bool isMinimizing, typename RNG = ThreadLocalRandom>
 class MetropolisAcceptance final : public AcceptanceStrategy<S> {
     [[no_unique_address]] RNG rng_;
@@ -17,6 +23,7 @@ class MetropolisAcceptance final : public AcceptanceStrategy<S> {
     using ScoreType = S;
     explicit MetropolisAcceptance(RNG rng = RNG()) : rng_(std::move(rng)) {}
 
+    /// @brief Applies the Metropolis rule; rejects all candidates at nonpositive temperatures.
     [[nodiscard]] bool shouldAccept(const ScoreType &current_score, const ScoreType &neighbour_score,
                                     const double temperature) const override {
         if (temperature <= 0.0) {
@@ -33,6 +40,7 @@ class MetropolisAcceptance final : public AcceptanceStrategy<S> {
         return std::exp(delta / temperature) > rng_.random01();
     }
 
+    /// @brief Returns an owning copy of this operator.
     [[nodiscard]] std::unique_ptr<AcceptanceStrategy<S>> clone() const override {
         return std::make_unique<MetropolisAcceptance>(*this);
     }

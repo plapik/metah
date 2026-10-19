@@ -15,6 +15,16 @@
 #include "metah/problem.hpp"
 
 namespace metah {
+/**
+ * @brief Generational genetic algorithm with OpenMP offspring generation and evaluation.
+ * @tparam P Problem type; isMinimizing determines the optimization direction.
+ *
+ * Retains the best solution seen, without automatically preserving it in the population.
+ * @note Evaluation, selection, crossover, and mutation may run concurrently on
+ * shared instances. Exceptions must not escape parallel callbacks.
+ * @note Register each non-null observer once, before run(), and keep it alive during it.
+ * Observers receive the current population and scores.
+ */
 template <typename P> class GeneticAlgorithm final : public Optimizer<P> {
   public:
     using Base = Optimizer<P>;
@@ -87,6 +97,22 @@ template <typename P> class GeneticAlgorithm final : public Optimizer<P> {
     }
 
   public:
+    /**
+     * @brief Generates the initial population and takes ownership of selection, crossover, and mutation.
+     * Odd population sizes are rounded down to an even number. The generator is
+     * borrowed only during construction.
+     * @param problem Shared problem used to evaluate population members.
+     * @param population_size Population count, at least two; odd values are rounded down.
+     * @param generations Number of generations per run(); zero only notifies observers.
+     * @param threads Positive OpenMP thread count.
+     * @param chunk_size Positive number of offspring pairs per dynamic scheduling chunk.
+     * @param select Selection operator whose ownership is transferred to the algorithm.
+     * @param cross Crossover operator whose ownership is transferred to the algorithm.
+     * @param mutate Mutation operator whose ownership is transferred to the algorithm.
+     * @param generator Borrowed generator used to create the initial population.
+     * @throws std::invalid_argument if population_size < 2, threads or chunk_size
+     * is zero, or the problem or an operator is null.
+     */
     GeneticAlgorithm(std::shared_ptr<const ProblemType> problem, const size_t population_size, const size_t generations,
                      const size_t threads, const size_t chunk_size, std::unique_ptr<Selection<ScoreType>> select,
                      std::unique_ptr<Crossover<ReprType>> cross, std::unique_ptr<Mutate<ReprType>> mutate,
@@ -112,8 +138,14 @@ template <typename P> class GeneticAlgorithm final : public Optimizer<P> {
         update_best_solution();
     }
 
+    /// @brief Returns a copy of the best solution seen; not safe concurrently with run().
     [[nodiscard]] SolutionType getBest() const override { return best_solution_; }
 
+    /**
+     * @brief Runs the configured number of additional generations, retaining the population and best solution.
+     * Observers are notified at generation zero and after each generation; numbering
+     * restarts on each call. Do not run the same instance concurrently.
+     */
     void run() override {
         auto next_pop = population_;
         auto next_scores = scores_;
@@ -147,8 +179,16 @@ template <typename P> class GeneticAlgorithm final : public Optimizer<P> {
         }
     }
 
+    /// @brief Registers an observer whose updates may overlap the next offspring generation.
+    /// @param observer Non-null borrowed instance; register once and keep alive during run().
     void addLowPrioObserver(PopObserver *observer) { low_prio_observers_.push_back(observer); }
 
+    /**
+     * @brief Registers a blocking observer: execution waits for all high-priority updates before proceeding.
+     * Callbacks may run on different workers, but the next offspring generation
+     * cannot begin until they all finish.
+     * @param observer Non-null borrowed instance; register once and keep alive during run().
+     */
     void addHighPrioObserver(PopObserver *observer) { high_prio_observers_.push_back(observer); }
 
     ~GeneticAlgorithm() override = default;
@@ -168,6 +208,10 @@ GeneticAlgorithm(std::shared_ptr<ProblemType> problem, size_t, size_t, size_t, s
                  std::unique_ptr<Mutate<typename ProblemType::ReprType>>, Generator<ProblemType> &)
     -> GeneticAlgorithm<ProblemType>;
 
+/**
+ * @brief Configures a genetic algorithm; requires selection, crossover, mutation, and a generator.
+ * Defaults to a population of 100, 100 generations, one thread, and a scheduling chunk of one.
+ */
 template <typename P> class GeneticAlgorithmBuilder {
   public:
     using ProblemType = P;
@@ -186,53 +230,65 @@ template <typename P> class GeneticAlgorithmBuilder {
     std::unique_ptr<Generator<ProblemType>> generator_;
 
   public:
+    /// @brief Starts configuration with a shared problem; validation occurs in build().
     explicit GeneticAlgorithmBuilder(std::shared_ptr<const ProblemType> p) : problem_(std::move(p)) {}
 
+    /// @brief Sets the shared problem used by subsequently built optimizers.
     GeneticAlgorithmBuilder &problem(std::shared_ptr<const ProblemType> p) {
         problem_ = std::move(p);
         return *this;
     }
 
+    /// @brief Sets the population size, at least two; odd values are rounded down during construction.
     GeneticAlgorithmBuilder &populationSize(const size_t population_size) {
         population_size_ = population_size;
         return *this;
     }
 
+    /// @brief Sets the generations per run(); zero performs only initial notification.
     GeneticAlgorithmBuilder &generations(const size_t generations) {
         generations_ = generations;
         return *this;
     }
 
+    /// @brief Sets the positive OpenMP thread count.
     GeneticAlgorithmBuilder &threads(const size_t threads) {
         threads_ = threads;
         return *this;
     }
 
+    /// @brief Sets the positive chunk size, measured in pairs of offspring.
     GeneticAlgorithmBuilder &chunkSize(const size_t chunk_size) {
         chunk_size_ = chunk_size;
         return *this;
     }
 
+    /// @brief Takes ownership of the selection configuration.
     GeneticAlgorithmBuilder &selection(std::unique_ptr<Selection<ScoreType>> selection) {
         select_ = std::move(selection);
         return *this;
     }
 
+    /// @brief Takes ownership of the crossover configuration.
     GeneticAlgorithmBuilder &crossover(std::unique_ptr<Crossover<ReprType>> crossover) {
         cross_ = std::move(crossover);
         return *this;
     }
 
+    /// @brief Takes ownership of the mutation configuration.
     GeneticAlgorithmBuilder &mutation(std::unique_ptr<Mutate<ReprType>> mutation) {
         mutate_ = std::move(mutation);
         return *this;
     }
 
+    /// @brief Takes ownership of the generator used to initialize each built optimizer.
     GeneticAlgorithmBuilder &generator(std::unique_ptr<Generator<ProblemType>> generator) {
         generator_ = std::move(generator);
         return *this;
     }
 
+    /// @brief Builds an initialized optimizer from cloned operators and the configured generator.
+    /// @throws std::invalid_argument if configuration is invalid or a required component is missing.
     [[nodiscard]] GeneticAlgorithm<ProblemType> build() const {
         if (!select_) {
             throw std::invalid_argument("Selection method must be set");

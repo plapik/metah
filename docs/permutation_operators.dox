@@ -1,0 +1,38 @@
+/**
+ * @defgroup permutation_operators Permutation operators
+ * @brief Mutation, crossover, neighborhood generation, and perturbation for permutations.
+ *
+ * @par Representation requirements
+ * Operators are parameterized by the representation type, not tied to std::vector.
+ * Use a mutable random-access sequence supporting std::begin(), std::end(),
+ * std::size(), and operator[], with assignable and swappable elements.
+ * Typical representations include std::vector, std::array, and std::deque;
+ * contiguous storage is supported but is not required. Representations must
+ * satisfy the selected optimizer's copy and independent-storage requirements.
+ *
+ * @par Input and output requirements
+ * Representations must contain at least two elements. Output references must
+ * refer to initialized, independent representations of the required size;
+ * for example, output vectors must already be resized to match their inputs.
+ * Operators need not allocate or resize outputs. Crossover parents and outputs
+ * must have matching sizes. Output storage must not alias inputs or other outputs.
+ *
+ * @par Crossover values
+ * Ox and Pmx require both parents to be permutations of the integers in
+ * [0, size()), since gene values index internal lookup tables. Swap, insertion,
+ * and reversal operators do not impose this integer-encoding requirement.
+ *
+ * @par Randomness and concurrency
+ * RNG must provide the sampling functions used by the selected operator.
+ * It must be copy-constructible because cloning an operator copies its stored RNG;
+ * the RNG itself does not need a clone() method. Constructors initialize the RNG
+ * from an rvalue, using a move constructor if available or a copy constructor
+ * otherwise. Default construction is required only when no RNG instance is supplied.
+ * Concurrent calls on the same operator require a thread-safe RNG, such as
+ * metah::ThreadLocalRandom.
+ */
+
+/**
+ * @dir src/metah/operators/permut
+ * @brief Permutation operators; see @ref permutation_operators for shared requirements.
+ */

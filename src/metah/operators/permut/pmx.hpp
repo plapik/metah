@@ -12,6 +12,14 @@
 #include "metah/util/rng.hpp"
 
 namespace metah::permut {
+/**
+ * @brief Partially mapped crossover: exchanges segments and resolves duplicate genes through a mapping.
+ * @ingroup permutation_operators
+ * @pre Both parents are permutations of the integers in [0, size()).
+ * @note Computation reuses two thread-local scratch buffers per template specialization.
+ * Instances on the same thread share these buffers; allocated capacity may be
+ * retained until the thread exits.
+ */
 template <typename R = std::vector<size_t>, typename RNG = ThreadLocalRandom> class Pmx final : public Crossover<R> {
     [[no_unique_address]] RNG rng_;
     double chance_;
@@ -19,7 +27,9 @@ template <typename R = std::vector<size_t>, typename RNG = ThreadLocalRandom> cl
   public:
     using Base = Crossover<R>;
     using typename Base::ReprType;
+    /// @brief Creates a partially mapped crossover with probability chance in [0, 1].
     explicit Pmx(const double chance, RNG rng = RNG()) : rng_(std::move(rng)), chance_(chance) {}
+    /// @brief Writes two offspring; copies corresponding parents when crossover is skipped and returns false.
     bool cross(const ReprType &p1, const ReprType &p2, ReprType &c1, ReprType &c2) override {
         assert(&p1 != &c1 && &p1 != &c2 && &p2 != &c1 && &p2 != &c2);
         assert(std::size(p1) >= 2);

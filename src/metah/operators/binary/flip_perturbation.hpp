@@ -10,6 +10,10 @@
 #include "metah/util/rng.hpp"
 
 namespace metah::binary {
+/**
+ * @brief Perturbs a binary representation by flipping exactly one random bit.
+ * @ingroup binary_operators
+ */
 template <typename R = std::vector<uint8_t>, typename RNG = ThreadLocalRandom>
 class SingleFlipPerturbation final : public Perturbation<R> {
     [[no_unique_address]] RNG rng_;
@@ -20,6 +24,7 @@ class SingleFlipPerturbation final : public Perturbation<R> {
 
     explicit SingleFlipPerturbation(RNG rng = RNG()) : rng_(std::move(rng)) {}
 
+    /// @brief Copies current to target and flips one bit.
     void perturb(const ReprType &current, ReprType &target) override {
         assert(!current.empty());
         target = current;
@@ -32,6 +37,10 @@ class SingleFlipPerturbation final : public Perturbation<R> {
     }
 };
 
+/**
+ * @brief Perturbs a binary representation by independently flipping each bit.
+ * @ingroup binary_operators
+ */
 template <typename R = std::vector<uint8_t>, typename RNG = ThreadLocalRandom>
 class FlipPerturbation final : public Perturbation<R> {
     [[no_unique_address]] RNG rng_;
@@ -41,9 +50,11 @@ class FlipPerturbation final : public Perturbation<R> {
     using Base = Perturbation<R>;
     using typename Base::ReprType;
 
+    /// @brief Sets the per-bit flip probability.
     explicit FlipPerturbation(const double flip_chance, RNG rng = RNG())
         : rng_(std::move(rng)), flip_chance_(flip_chance) {}
 
+    /// @brief Copies current to target and flips selected bits; the result may be unchanged.
     void perturb(const ReprType &current, ReprType &target) override {
         assert(!current.empty());
         target = current;

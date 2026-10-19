@@ -15,6 +15,19 @@
 #include "metah/optimizer.hpp"
 
 namespace metah {
+/**
+ * @brief OpenMP tabu search selecting the best admissible neighbor each iteration.
+ * @tparam P Problem type; isMinimizing determines the optimization direction.
+ * @tparam M Copyable, default-constructible move type.
+ * @tparam T Owned tabu-list type providing contains(move) const and add(move).
+ *
+ * A tabu move is admissible when its candidate improves the best score seen.
+ * If no admissible candidate exists, the current solution and tabu list are retained.
+ * @note Neighbor generation, evaluation, and tabu lookup may run concurrently.
+ * Tabu insertion has exclusive access. Exceptions must not escape parallel callbacks.
+ * @note Register each non-null observer once, before run(), and keep it alive during it.
+ * Observers receive the current solution, which may be worse than getBest().
+ */
 template <typename P, typename M, typename T = FifoTabuList<M>> class TabuSearch : public Optimizer<P> {
   public:
     using Base = Optimizer<P>;
@@ -60,6 +73,20 @@ template <typename P, typename M, typename T = FifoTabuList<M>> class TabuSearch
     }
 
   public:
+    /**
+     * @brief Generates the initial solution and takes ownership of the neighbor generator and tabu list.
+     * The generator is borrowed only during construction. An lvalue list is copied;
+     * an rvalue is moved, preserving existing tabu entries in either case.
+     * @param evaluator Shared problem used to evaluate candidates.
+     * @param iterations Neighborhood search iterations per run(); zero only notifies observers.
+     * @param tabu_list Configured tabu memory owned by the search.
+     * @param threads Positive OpenMP thread count.
+     * @param chunk_size Positive number of candidates per dynamic scheduling chunk.
+     * @param neighbour_gen Neighbor generator whose ownership is transferred to the search.
+     * @param generator Borrowed generator used to create the initial solution.
+     * @pre threads and chunk_size are positive.
+     * @throws std::invalid_argument if evaluator or neighbour_gen is null.
+     */
     TabuSearch(std::shared_ptr<const ProblemType> evaluator, const uint64_t iterations, TabuListType tabu_list,
                const size_t threads, const size_t chunk_size,
                std::unique_ptr<NeighbourGen<ReprType, MoveType>> neighbour_gen, Generator<ProblemType> &generator)
@@ -69,16 +96,30 @@ template <typename P, typename M, typename T = FifoTabuList<M>> class TabuSearch
           tabu_list_(std::move(tabu_list)), current_solution_(generator.generateSolution(this->getProblem())),
           best_solution_(current_solution_) {}
 
+    /// @brief Returns a copy of the best solution seen; not safe concurrently with run().
     [[nodiscard]] SolutionType getBest() const override { return best_solution_; }
 
+    /**
+     * @brief Registers a blocking observer: execution waits for all high-priority updates before proceeding.
+     * Callbacks may run on different workers, but the next neighborhood evaluation
+     * cannot begin until they all finish.
+     * @param observer Non-null borrowed instance; register once and keep alive during run().
+     */
     void addHighPrioObserver(SolutionObserver<ReprType, ScoreType> *observer) {
         high_prio_observers_.push_back(observer);
     }
 
+    /// @brief Registers an observer whose updates may overlap the next neighborhood evaluation.
+    /// @param observer Non-null borrowed instance; register once and keep alive during run().
     void addLowPrioObserver(SolutionObserver<ReprType, ScoreType> *observer) {
         low_prio_observers_.push_back(observer);
     }
 
+    /**
+     * @brief Runs the configured number of additional iterations, retaining solutions and tabu history.
+     * Observers are notified at iteration zero and after each iteration; numbering
+     * restarts on each call. Do not run the same instance concurrently.
+     */
     void run() override {
         SolutionType best_neighbour = current_solution_;
         MoveType best_move{};
@@ -147,6 +188,10 @@ TabuSearch(std::shared_ptr<ProblemType> evaluator, size_t iterations, TabuListTy
            size_t chunk_size, std::unique_ptr<NeighbourGenType> neighbour_gen, Generator<ProblemType> &generator)
     -> TabuSearch<ProblemType, typename NeighbourGenType::MoveType, TabuListType>;
 
+/**
+ * @brief Configures tabu search; requires a neighbor generator, solution generator, and tabu list.
+ * Defaults to 100 iterations, one thread, and a scheduling chunk of one.
+ */
 template <typename P, typename M, typename T = FifoTabuList<M>> class TabuSearchBuilder {
   public:
     using ProblemType = P;
@@ -177,43 +222,53 @@ template <typename P, typename M, typename T = FifoTabuList<M>> class TabuSearch
     }
 
   public:
+    /// @brief Starts configuration with a shared problem; validation occurs in build().
     explicit TabuSearchBuilder(std::shared_ptr<const ProblemType> p) : problem_(std::move(p)) {}
 
+    /// @brief Sets the shared problem used by subsequently built optimizers.
     TabuSearchBuilder &problem(std::shared_ptr<const ProblemType> p) {
         problem_ = std::move(p);
         return *this;
     }
 
+    /// @brief Sets the number of iterations per run(); zero performs only initial notification.
     TabuSearchBuilder &iterations(const size_t iterations) {
         iterations_ = iterations;
         return *this;
     }
 
+    /// @brief Stores a configured list by copy or move, including any existing tabu entries.
     TabuSearchBuilder &tabuList(TabuListType tabu_list) {
         tabu_list_.emplace(std::move(tabu_list));
         return *this;
     }
 
+    /// @brief Sets the positive OpenMP thread count.
     TabuSearchBuilder &threads(const size_t threads) {
         threads_ = threads;
         return *this;
     }
 
+    /// @brief Sets the positive chunk size for dynamically scheduled neighbor evaluation.
     TabuSearchBuilder &chunkSize(const size_t chunk_size) {
         chunk_size_ = chunk_size;
         return *this;
     }
 
+    /// @brief Takes ownership of the generator used to initialize each built optimizer.
     TabuSearchBuilder &generator(std::unique_ptr<Generator<ProblemType>> generator) {
         generator_ = std::move(generator);
         return *this;
     }
 
+    /// @brief Takes ownership of the neighbor generator configuration.
     TabuSearchBuilder &neighbour(std::unique_ptr<NeighbourGen<ReprType, MoveType>> neighbour_gen) {
         neighbour_gen_ = std::move(neighbour_gen);
         return *this;
     }
 
+    /// @brief Builds using a copied tabu list and cloned neighbor generator.
+    /// @throws std::invalid_argument if the problem or a required component is missing.
     [[nodiscard]] TabuSearch<ProblemType, MoveType, TabuListType> build() const & {
         validate();
 
@@ -221,6 +276,8 @@ template <typename P, typename M, typename T = FifoTabuList<M>> class TabuSearch
                                                                chunk_size_, neighbour_gen_->clone(), *generator_);
     }
 
+    /// @brief Builds by moving the tabu list and neighbor generator out of this builder.
+    /// @throws std::invalid_argument if the problem or a required component is missing.
     [[nodiscard]] TabuSearch<ProblemType, MoveType, TabuListType> build() && {
         validate();
 

@@ -2,6 +2,7 @@
 #define SRC_METAH_SOLUTION_HPP_
 
 namespace metah {
+/// @brief A candidate representation paired with its score.
 template <typename R, typename S> struct Solution final {
     using ReprType = R;
     using ScoreType = S;

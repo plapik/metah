@@ -12,6 +12,12 @@
 #include "metah/util/rng.hpp"
 
 namespace metah::binary {
+/**
+ * @brief Single-point crossover on packed bitsets using block copies and a split-block mask.
+ * @ingroup binary_operators
+ * @note Skipped crossover leaves outputs unchanged. Initialize them from the
+ * corresponding parents beforehand if parent copies are required in that case.
+ */
 template <typename R = DynamicBitset<>, typename RNG = ThreadLocalRandom>
 class BitsetSinglePointCrossover final : public Crossover<R> {
     [[no_unique_address]] RNG rng_;
@@ -23,8 +29,10 @@ class BitsetSinglePointCrossover final : public Crossover<R> {
     using Base = Crossover<R>;
     using typename Base::ReprType;
 
+    /// @brief Creates a packed-bit crossover with probability chance in [0, 1].
     explicit BitsetSinglePointCrossover(const double chance, RNG rng = RNG()) : rng_(std::move(rng)), chance_(chance) {}
 
+    /// @brief Exchanges tails at a random split in [1, size() - 1]; returns whether crossover was applied.
     bool cross(const ReprType &p1, const ReprType &p2, ReprType &c1, ReprType &c2) override {
         assert(&p1 != &c1 && &p1 != &c2 && &p2 != &c1 && &p2 != &c2);
         assert(std::size(p1) >= 2);

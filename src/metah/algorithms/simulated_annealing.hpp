@@ -16,6 +16,15 @@
 #include "metah/optimizer.hpp"
 
 namespace metah {
+/**
+ * @brief Serial simulated annealing with pluggable perturbation, acceptance, and cooling.
+ * @tparam P Problem type; isMinimizing determines the optimization direction.
+ *
+ * Strict improvements are always accepted; other candidates use the acceptance
+ * strategy. Cooling is applied after every iteration, including rejected moves.
+ * @note Register each non-null observer once, before run(), and keep it alive during it.
+ * Observers receive the current solution, which may be worse than getBest().
+ */
 template <typename P> class SimulatedAnnealing final : public Optimizer<P> {
   public:
     using Base = Optimizer<P>;
@@ -45,6 +54,19 @@ template <typename P> class SimulatedAnnealing final : public Optimizer<P> {
     }
 
   public:
+    /**
+     * @brief Generates the initial solution, stores the initial temperature, and takes ownership of the operators.
+     * The generator is borrowed only during construction. Temperature requirements
+     * are defined by the selected acceptance and cooling operators.
+     * @param problem Shared problem used to evaluate candidates.
+     * @param iterations Candidate evaluations per run(); zero only notifies observers.
+     * @param temperature Initial temperature, valid for the selected acceptance and cooling operators.
+     * @param perturbation Operator producing candidates; ownership is transferred to the algorithm.
+     * @param cooling_schema Temperature schedule; ownership is transferred to the algorithm.
+     * @param acceptance_prob Acceptance strategy; ownership is transferred to the algorithm.
+     * @param generator Borrowed generator used to create the initial solution.
+     * @throws std::invalid_argument if the problem or any operator is null.
+     */
     SimulatedAnnealing(std::shared_ptr<const ProblemType> problem, const uint64_t iterations, const double temperature,
                        std::unique_ptr<Perturbation<ReprType>> perturbation,
                        std::unique_ptr<CoolingSchema> cooling_schema,
@@ -59,16 +81,26 @@ template <typename P> class SimulatedAnnealing final : public Optimizer<P> {
           cooling_schema_(cooling_schema ? std::move(cooling_schema)
                                          : throw std::invalid_argument("cooling_schema must not be null")) {}
 
+    /// @brief Returns a copy of the best solution seen; not safe concurrently with run().
     [[nodiscard]] SolutionType getBest() const override { return best_solution_; }
 
+    /// @brief Registers a blocking observer called before low-priority observers; run() waits for it to return.
+    /// @param observer Non-null borrowed instance; register once and keep alive during run().
     void addHighPrioObserver(SolutionObserver<ReprType, ScoreType> *observer) {
         high_prio_observers_.push_back(observer);
     }
 
+    /// @brief Registers an observer called after high-priority observers; it also blocks this serial algorithm.
+    /// @param observer Non-null borrowed instance; register once and keep alive during run().
     void addLowPrioObserver(SolutionObserver<ReprType, ScoreType> *observer) {
         low_prio_observers_.push_back(observer);
     }
 
+    /**
+     * @brief Runs additional iterations from the retained solution and temperature, without reheating.
+     * Observer and cooling iteration numbers restart on each call. Observers are
+     * notified at iteration zero and after each iteration. Do not run the same instance concurrently.
+     */
     void run() override {
         notifyObservers();
         SolutionType neighbour_solution = current_solution_;
@@ -114,6 +146,10 @@ SimulatedAnnealing(std::shared_ptr<ProblemType> problem, uint64_t iterations, do
                    std::unique_ptr<AcceptanceStrategy<typename ProblemType::ScoreType>> acceptance_prob,
                    Generator<ProblemType> &generator) -> SimulatedAnnealing<ProblemType>;
 
+/**
+ * @brief Configures simulated annealing; requires perturbation, acceptance, cooling, and a generator.
+ * Defaults to 1000 iterations and an initial temperature of 100.
+ */
 template <typename P> class SimulatedAnnealingBuilder {
   public:
     using ProblemType = P;
@@ -130,43 +166,53 @@ template <typename P> class SimulatedAnnealingBuilder {
     std::unique_ptr<Generator<ProblemType>> generator_;
 
   public:
+    /// @brief Starts configuration with a shared problem; validation occurs in build().
     explicit SimulatedAnnealingBuilder(std::shared_ptr<const ProblemType> p) : problem_(std::move(p)) {}
 
+    /// @brief Sets the shared problem used by subsequently built optimizers.
     SimulatedAnnealingBuilder &problem(std::shared_ptr<const ProblemType> p) {
         problem_ = std::move(p);
         return *this;
     }
 
+    /// @brief Sets the number of iterations per run(); zero performs only initial notification.
     SimulatedAnnealingBuilder &iterations(const uint64_t iterations) {
         iterations_ = iterations;
         return *this;
     }
 
+    /// @brief Sets the initial temperature; use a value valid for the selected operators.
     SimulatedAnnealingBuilder &temperature(const double temperature) {
         temperature_ = temperature;
         return *this;
     }
 
+    /// @brief Takes ownership of the perturbation configuration.
     SimulatedAnnealingBuilder &perturbation(std::unique_ptr<Perturbation<ReprType>> perturbation) {
         perturbation_ = std::move(perturbation);
         return *this;
     }
 
+    /// @brief Takes ownership of the cooling schedule configuration.
     SimulatedAnnealingBuilder &cooling(std::unique_ptr<CoolingSchema> cooling_schema) {
         cooling_schema_ = std::move(cooling_schema);
         return *this;
     }
 
+    /// @brief Takes ownership of the acceptance strategy configuration.
     SimulatedAnnealingBuilder &acceptance(std::unique_ptr<AcceptanceStrategy<ScoreType>> acceptance) {
         acceptance_ = std::move(acceptance);
         return *this;
     }
 
+    /// @brief Takes ownership of the generator used to initialize each built optimizer.
     SimulatedAnnealingBuilder &generator(std::unique_ptr<Generator<ProblemType>> generator) {
         generator_ = std::move(generator);
         return *this;
     }
 
+    /// @brief Builds an initialized optimizer from cloned operators and the configured generator.
+    /// @throws std::invalid_argument if the problem or a required component is missing.
     [[nodiscard]] SimulatedAnnealing<ProblemType> build() const {
         if (!perturbation_) {
             throw std::invalid_argument("Perturbation must be set");

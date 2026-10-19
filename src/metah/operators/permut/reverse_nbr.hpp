@@ -11,6 +11,8 @@
 #include "metah/util/rng.hpp"
 
 namespace metah::permut {
+/// @brief Inclusive endpoints of a reversed segment.
+/// @ingroup permutation_operators
 struct ReverseMove {
     size_t i;
     size_t j;
@@ -22,6 +24,10 @@ struct ReverseMove {
     }
 };
 
+/**
+ * @brief Samples neighbors by reversing random segments.
+ * @ingroup permutation_operators
+ */
 template <typename R = std::vector<size_t>, typename RNG = ThreadLocalRandom>
 class ReverseNeighbour final : public NeighbourGen<R, ReverseMove> {
     [[no_unique_address]] RNG rng_;
@@ -32,11 +38,14 @@ class ReverseNeighbour final : public NeighbourGen<R, ReverseMove> {
     using typename Base::MoveType;
     using typename Base::ReprType;
 
+    /// @brief Sets the number of random candidates sampled per neighborhood evaluation.
     explicit ReverseNeighbour(const size_t neighbourhood_size, RNG rng = RNG())
         : rng_(std::move(rng)), nbr_size_(neighbourhood_size) {}
 
+    /// @brief Returns the configured candidate count, independent of original.
     [[nodiscard]] size_t size(const ReprType &original) const override { return nbr_size_; }
 
+    /// @brief Writes a reversal neighbor and returns its ordered endpoints; idx is ignored.
     MoveType generate(const ReprType &original, ReprType &target, size_t idx) override {
         assert(&original != &target);
         assert(std::size(target) >= 2);

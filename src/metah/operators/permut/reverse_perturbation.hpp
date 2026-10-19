@@ -11,6 +11,10 @@
 #include "metah/util/rng.hpp"
 
 namespace metah::permut {
+/**
+ * @brief Perturbs a representation by reversing a random inclusive segment.
+ * @ingroup permutation_operators
+ */
 template <typename R = std::vector<size_t>, typename RNG = ThreadLocalRandom>
 class ReversePerturbation final : public Perturbation<R> {
     [[no_unique_address]] RNG rng_;
@@ -21,6 +25,7 @@ class ReversePerturbation final : public Perturbation<R> {
 
     explicit ReversePerturbation(RNG rng = RNG()) : rng_(std::move(rng)) {}
 
+    /// @brief Copies current to target and reverses the segment between two distinct random positions.
     void perturb(const ReprType &current, ReprType &target) override {
         assert(std::size(current) >= 2);
         target = current;

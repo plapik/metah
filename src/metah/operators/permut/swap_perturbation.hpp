@@ -10,6 +10,10 @@
 #include "metah/util/rng.hpp"
 
 namespace metah::permut {
+/**
+ * @brief Perturbs a representation by swapping two distinct random positions.
+ * @ingroup permutation_operators
+ */
 template <typename R = std::vector<size_t>, typename RNG = ThreadLocalRandom>
 class SwapPerturbation final : public Perturbation<R> {
     [[no_unique_address]] RNG rng_;
@@ -20,6 +24,7 @@ class SwapPerturbation final : public Perturbation<R> {
 
     explicit SwapPerturbation(RNG rng = RNG()) : rng_(std::move(rng)) {}
 
+    /// @brief Copies current to target and swaps two positions.
     void perturb(const ReprType &current, ReprType &target) override {
         assert(std::size(current) >= 2);
         target = current;

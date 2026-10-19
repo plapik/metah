@@ -10,6 +10,10 @@
 #include "metah/util/rng.hpp"
 
 namespace metah::binary {
+/**
+ * @brief Mutates a binary representation by flipping each bit independently.
+ * @ingroup binary_operators
+ */
 template <typename R = std::vector<uint8_t>, typename RNG = ThreadLocalRandom> class FlipMut final : public Mutate<R> {
     [[no_unique_address]] RNG rng_;
     double chance_;
@@ -18,8 +22,10 @@ template <typename R = std::vector<uint8_t>, typename RNG = ThreadLocalRandom> c
     using Base = Mutate<R>;
     using typename Base::ReprType;
 
+    /// @brief Sets the per-bit flip probability.
     explicit FlipMut(const double chance, RNG rng = RNG()) : rng_(std::move(rng)), chance_(chance) {}
 
+    /// @brief Flips selected bits in place; returns whether at least one bit changed.
     bool mutate(ReprType &repr) override {
         const size_t n = std::size(repr);
         assert(n >= 1);

@@ -10,6 +10,8 @@
 #include "metah/util/rng.hpp"
 
 namespace metah::binary {
+/// @brief Zero-based index of a flipped bit.
+/// @ingroup binary_operators
 struct FlipMove {
     size_t index;
 
@@ -20,6 +22,8 @@ struct FlipMove {
     }
 };
 
+/// @brief Flipped indices, recorded in ascending order by FlipNeighbour; may be empty.
+/// @ingroup binary_operators
 struct ChanceFlipMove {
     std::vector<size_t> indices;
 
@@ -33,6 +37,10 @@ struct ChanceFlipMove {
     }
 };
 
+/**
+ * @brief Samples neighbors that differ from the original by exactly one random bit.
+ * @ingroup binary_operators
+ */
 template <typename R = std::vector<uint8_t>, typename RNG = ThreadLocalRandom>
 class SingleFlipNeighbour final : public NeighbourGen<R, FlipMove> {
     [[no_unique_address]] RNG rng_;
@@ -43,11 +51,14 @@ class SingleFlipNeighbour final : public NeighbourGen<R, FlipMove> {
     using typename Base::MoveType;
     using typename Base::ReprType;
 
+    /// @brief Sets the number of random candidates sampled per neighborhood evaluation.
     explicit SingleFlipNeighbour(const size_t neighbourhood_size, RNG rng = RNG())
         : rng_(std::move(rng)), neighbourhood_size_(neighbourhood_size) {}
 
+    /// @brief Returns the configured candidate count, independent of original.
     [[nodiscard]] size_t size(const ReprType &original) const override { return neighbourhood_size_; }
 
+    /// @brief Copies original, flips one bit in target, and returns its index; idx is ignored.
     MoveType generate(const ReprType &original, ReprType &target, size_t idx) override {
         assert(&original != &target);
         assert(!original.empty());
@@ -63,6 +74,10 @@ class SingleFlipNeighbour final : public NeighbourGen<R, FlipMove> {
     }
 };
 
+/**
+ * @brief Samples neighbors by independently flipping each bit with a given probability.
+ * @ingroup binary_operators
+ */
 template <typename R = std::vector<uint8_t>, typename RNG = ThreadLocalRandom>
 class FlipNeighbour final : public NeighbourGen<R, ChanceFlipMove> {
     [[no_unique_address]] RNG rng_;
@@ -74,11 +89,14 @@ class FlipNeighbour final : public NeighbourGen<R, ChanceFlipMove> {
     using typename Base::MoveType;
     using typename Base::ReprType;
 
+    /// @brief Sets the candidate count and per-bit flip probability.
     explicit FlipNeighbour(const size_t neighbourhood_size, const double flip_chance, RNG rng = RNG())
         : rng_(std::move(rng)), neighbourhood_size_(neighbourhood_size), flip_chance_(flip_chance) {}
 
+    /// @brief Returns the configured candidate count, independent of original.
     [[nodiscard]] size_t size(const ReprType &original) const override { return neighbourhood_size_; }
 
+    /// @brief Copies original, flips selected bits in target, and returns their indices; idx is ignored.
     MoveType generate(const ReprType &original, ReprType &target, size_t idx) override {
         assert(&original != &target);
         assert(!original.empty());

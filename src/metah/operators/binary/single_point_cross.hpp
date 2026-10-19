@@ -11,6 +11,10 @@
 #include "metah/util/rng.hpp"
 
 namespace metah::binary {
+/**
+ * @brief Produces offspring by exchanging parent tails at one random split point.
+ * @ingroup binary_operators
+ */
 template <typename R = std::vector<uint8_t>, typename RNG = ThreadLocalRandom>
 class SinglePointCrossover final : public Crossover<R> {
     [[no_unique_address]] RNG rng_;
@@ -20,8 +24,10 @@ class SinglePointCrossover final : public Crossover<R> {
     using Base = Crossover<R>;
     using typename Base::ReprType;
 
+    /// @brief Creates a single-point crossover with probability chance in [0, 1].
     explicit SinglePointCrossover(const double chance, RNG rng = RNG()) : rng_(std::move(rng)), chance_(chance) {}
 
+    /// @brief Writes offspring; copies corresponding parents when skipped and returns false.
     bool cross(const ReprType &p1, const ReprType &p2, ReprType &c1, ReprType &c2) override {
         assert(std::size(p1) >= 2);
         assert(std::size(p1) == std::size(p2));

@@ -4,10 +4,16 @@
 #include <memory>
 
 namespace metah {
+/**
+ * @brief Mutates an initialized representation in place.
+ * @note Implementations used by parallel optimizers must support concurrent calls.
+ */
 template <typename R> class Mutate {
   public:
     using ReprType = R;
+    /// @brief Modifies repr and returns whether it may have changed, requiring score reevaluation.
     virtual bool mutate(ReprType &repr) = 0;
+    /// @brief Returns an owning copy of this operator.
     [[nodiscard]] virtual std::unique_ptr<Mutate> clone() const = 0;
     virtual ~Mutate() = default;
 };
