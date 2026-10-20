@@ -131,8 +131,20 @@ bench/               microbenchmarks
 
 ## Versioning
 
-- Project version: **0.1.0**
-- Installed package config uses **SameMajorVersion** compatibility.
+- Project version: **0.2.0**
+- Installed package config uses **SameMajorVersion** version checks.
+
+The project follows [Semantic Versioning](https://semver.org/). Versions below
+`1.0.0` are in initial development: the public API is not yet stable. During this
+phase, breaking changes increment the minor version (for example, `0.1.0` to
+`0.2.0`), while backward-compatible bug fixes increment the patch version.
+
+Version `1.0.0` will mark a stable public API. From then on, breaking changes
+increment the major version, backward-compatible features increment the minor
+version, and backward-compatible bug fixes increment the patch version.
+
+CMake's version check does not guarantee API compatibility between different
+`0.x` minor releases.
 
 ## Third-party licenses
 
