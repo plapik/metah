@@ -46,8 +46,7 @@ template <typename P, typename M, typename T = FifoTabuList<M>> class TabuSearch
     TabuListType tabu_list_;
     SolutionType current_solution_;
     SolutionType best_solution_;
-    std::vector<SolutionObserver<ReprType, ScoreType> *> high_prio_observers_;
-    std::vector<SolutionObserver<ReprType, ScoreType> *> low_prio_observers_;
+    std::vector<SolutionObserver<ReprType, ScoreType> *> observers_;
 
     [[nodiscard]] static bool isBetter(const ScoreType &lhs, const ScoreType &rhs) {
         if constexpr (ProblemType::isMinimizing) {
@@ -58,16 +57,10 @@ template <typename P, typename M, typename T = FifoTabuList<M>> class TabuSearch
     }
 
     void notifyObservers(size_t iteration = 0) {
-        if (!high_prio_observers_.empty()) {
-#pragma omp for schedule(dynamic)
-            for (std::ptrdiff_t j = 0; j < static_cast<std::ptrdiff_t>(high_prio_observers_.size()); ++j) {
-                high_prio_observers_[j]->update(iteration, current_solution_);
-            }
-        }
-        if (!low_prio_observers_.empty()) {
+        if (!observers_.empty()) {
 #pragma omp for schedule(dynamic) nowait
-            for (std::ptrdiff_t j = 0; j < static_cast<std::ptrdiff_t>(low_prio_observers_.size()); ++j) {
-                low_prio_observers_[j]->update(iteration, current_solution_);
+            for (std::ptrdiff_t j = 0; j < static_cast<std::ptrdiff_t>(observers_.size()); ++j) {
+                observers_[j]->update(iteration, current_solution_);
             }
         }
     }
@@ -99,21 +92,9 @@ template <typename P, typename M, typename T = FifoTabuList<M>> class TabuSearch
     /// @brief Returns a copy of the best solution seen; not safe concurrently with run().
     [[nodiscard]] SolutionType getBest() const override { return best_solution_; }
 
-    /**
-     * @brief Registers a blocking observer: execution waits for all high-priority updates before proceeding.
-     * Callbacks may run on different workers, but the next neighborhood evaluation
-     * cannot begin until they all finish.
-     * @param observer Non-null borrowed instance; register once and keep alive during run().
-     */
-    void addHighPrioObserver(SolutionObserver<ReprType, ScoreType> *observer) {
-        high_prio_observers_.push_back(observer);
-    }
-
     /// @brief Registers an observer whose updates may overlap the next neighborhood evaluation.
     /// @param observer Non-null borrowed instance; register once and keep alive during run().
-    void addLowPrioObserver(SolutionObserver<ReprType, ScoreType> *observer) {
-        low_prio_observers_.push_back(observer);
-    }
+    void addObserver(SolutionObserver<ReprType, ScoreType> *observer) { observers_.push_back(observer); }
 
     /**
      * @brief Runs the configured number of additional iterations, retaining solutions and tabu history.

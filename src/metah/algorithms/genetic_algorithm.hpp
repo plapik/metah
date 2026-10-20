@@ -49,8 +49,7 @@ template <typename P> class GeneticAlgorithm final : public Optimizer<P> {
     Population population_;
     Scores scores_;
     SolutionType best_solution_;
-    std::vector<PopObserver *> low_prio_observers_;
-    std::vector<PopObserver *> high_prio_observers_;
+    std::vector<PopObserver *> observers_;
 
     void update_best_solution() {
         size_t best_idx = 0;
@@ -82,16 +81,10 @@ template <typename P> class GeneticAlgorithm final : public Optimizer<P> {
     }
 
     void notifyObservers(uint64_t iteration = 0) {
-        if (!high_prio_observers_.empty()) {
-#pragma omp for schedule(dynamic)
-            for (std::ptrdiff_t j = 0; j < static_cast<std::ptrdiff_t>(high_prio_observers_.size()); ++j) {
-                high_prio_observers_[j]->update(iteration, population_, scores_);
-            }
-        }
-        if (!low_prio_observers_.empty()) {
+        if (!observers_.empty()) {
 #pragma omp for schedule(dynamic) nowait
-            for (std::ptrdiff_t j = 0; j < static_cast<std::ptrdiff_t>(low_prio_observers_.size()); ++j) {
-                low_prio_observers_[j]->update(iteration, population_, scores_);
+            for (std::ptrdiff_t j = 0; j < static_cast<std::ptrdiff_t>(observers_.size()); ++j) {
+                observers_[j]->update(iteration, population_, scores_);
             }
         }
     }
@@ -181,15 +174,7 @@ template <typename P> class GeneticAlgorithm final : public Optimizer<P> {
 
     /// @brief Registers an observer whose updates may overlap the next offspring generation.
     /// @param observer Non-null borrowed instance; register once and keep alive during run().
-    void addLowPrioObserver(PopObserver *observer) { low_prio_observers_.push_back(observer); }
-
-    /**
-     * @brief Registers a blocking observer: execution waits for all high-priority updates before proceeding.
-     * Callbacks may run on different workers, but the next offspring generation
-     * cannot begin until they all finish.
-     * @param observer Non-null borrowed instance; register once and keep alive during run().
-     */
-    void addHighPrioObserver(PopObserver *observer) { high_prio_observers_.push_back(observer); }
+    void addObserver(PopObserver *observer) { observers_.push_back(observer); }
 
     ~GeneticAlgorithm() override = default;
 };

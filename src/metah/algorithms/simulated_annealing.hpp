@@ -41,15 +41,11 @@ template <typename P> class SimulatedAnnealing final : public Optimizer<P> {
     std::unique_ptr<Perturbation<ReprType>> perturbation_;
     std::unique_ptr<AcceptanceStrategy<ScoreType>> acceptance_;
     std::unique_ptr<CoolingSchema> cooling_schema_;
-    std::vector<SolutionObserver<ReprType, ScoreType> *> high_prio_observers_;
-    std::vector<SolutionObserver<ReprType, ScoreType> *> low_prio_observers_;
+    std::vector<SolutionObserver<ReprType, ScoreType> *> observers_;
 
     void notifyObservers(size_t iteration = 0) {
-        for (size_t j = 0; j < high_prio_observers_.size(); ++j) {
-            high_prio_observers_[j]->update(iteration, current_solution_);
-        }
-        for (size_t j = 0; j < low_prio_observers_.size(); ++j) {
-            low_prio_observers_[j]->update(iteration, current_solution_);
+        for (size_t j = 0; j < observers_.size(); ++j) {
+            observers_[j]->update(iteration, current_solution_);
         }
     }
 
@@ -84,17 +80,9 @@ template <typename P> class SimulatedAnnealing final : public Optimizer<P> {
     /// @brief Returns a copy of the best solution seen; not safe concurrently with run().
     [[nodiscard]] SolutionType getBest() const override { return best_solution_; }
 
-    /// @brief Registers a blocking observer called before low-priority observers; run() waits for it to return.
+    /// @brief Registers an observer called synchronously; run() waits for each update to return.
     /// @param observer Non-null borrowed instance; register once and keep alive during run().
-    void addHighPrioObserver(SolutionObserver<ReprType, ScoreType> *observer) {
-        high_prio_observers_.push_back(observer);
-    }
-
-    /// @brief Registers an observer called after high-priority observers; it also blocks this serial algorithm.
-    /// @param observer Non-null borrowed instance; register once and keep alive during run().
-    void addLowPrioObserver(SolutionObserver<ReprType, ScoreType> *observer) {
-        low_prio_observers_.push_back(observer);
-    }
+    void addObserver(SolutionObserver<ReprType, ScoreType> *observer) { observers_.push_back(observer); }
 
     /**
      * @brief Runs additional iterations from the retained solution and temperature, without reheating.

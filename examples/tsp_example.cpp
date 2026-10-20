@@ -49,18 +49,18 @@ int main() {
                            std::make_unique<mp::Pmx<Tsp::ReprType>>(0.9),
                            std::make_unique<mp::Reverse<Tsp::ReprType>>(0.2), tsp_random_gen);
     auto ga_ps = m::PopulationStatsFileLogger<Tsp::ReprType, Tsp::ScoreType>("tsp_ga.csv");
-    ga.addLowPrioObserver(&ga_ps);
+    ga.addObserver(&ga_ps);
 
     m::TabuSearch ts(tsp, 1000, m::FifoTabuList<mp::ReverseMove>(30), 4, 2,
                      std::make_unique<mp::ReverseNeighbour<Tsp::ReprType>>(30), tsp_random_gen);
     auto ta_ss = m::SolutionScoreFileLogger<Tsp::ReprType, Tsp::ScoreType>("tsp_ts.csv");
-    ts.addLowPrioObserver(&ta_ss);
+    ts.addObserver(&ta_ss);
 
     m::SimulatedAnnealing sa(tsp, 30000, 100.0, std::make_unique<mp::ReversePerturbation<Tsp::ReprType>>(),
                              std::make_unique<m::GeometricCooling>(0.9997),
                              std::make_unique<m::MetropolisAcceptance<Tsp::ScoreType, true>>(), tsp_random_gen);
     auto sa_ss = m::SolutionScoreFileLogger<Tsp::ReprType, Tsp::ScoreType>("tsp_sa.csv");
-    sa.addLowPrioObserver(&sa_ss);
+    sa.addObserver(&sa_ss);
 
     run_and_measure(ga, "GA");
     run_and_measure(ts, "TS");

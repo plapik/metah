@@ -42,8 +42,12 @@ class TestNeighbour final : public metah::NeighbourGen<int, int> {
 class PathObserver final : public metah::SolutionObserver<int, int> {
   public:
     std::vector<int> path;
+    std::vector<size_t> iterations;
 
-    void update(size_t, const int &repr, const int &) override { path.push_back(repr); }
+    void update(const size_t iteration, const int &repr, const int &) override {
+        path.push_back(repr);
+        iterations.push_back(iteration);
+    }
 };
 
 } // namespace
@@ -51,15 +55,24 @@ class PathObserver final : public metah::SolutionObserver<int, int> {
 TEST_SUITE_BEGIN("Tabu search");
 
 TEST_CASE("Default FIFO blocks recent moves and allows aspiration") {
+    size_t threads = 1;
+    SUBCASE("one worker") { threads = 1; }
+    SUBCASE("multiple workers") { threads = 4; }
+
     auto problem = std::make_shared<TestProblem>();
     TestGenerator generator;
     PathObserver observer;
-    metah::TabuSearch search(problem, 3, metah::FifoTabuList<int>(2), 2, 1, std::make_unique<TestNeighbour>(),
+    PathObserver second_observer;
+    metah::TabuSearch search(problem, 3, metah::FifoTabuList<int>(2), threads, 1, std::make_unique<TestNeighbour>(),
                              generator);
-    search.addHighPrioObserver(&observer);
+    search.addObserver(&observer);
+    search.addObserver(&second_observer);
     search.run();
 
     CHECK_EQ(observer.path, std::vector<int>{0, 1, 3, -1});
+    CHECK_EQ(observer.iterations, std::vector<size_t>{0, 1, 2, 3});
+    CHECK_EQ(second_observer.path, observer.path);
+    CHECK_EQ(second_observer.iterations, observer.iterations);
     CHECK_EQ(search.getBest().score, -1);
 }
 
@@ -72,7 +85,7 @@ TEST_CASE("Tabu search owns a copy of the supplied list") {
 
     metah::TabuSearch search(problem, 1, list, 1, 1, std::make_unique<TestNeighbour>(), generator);
     list.add(2);
-    search.addHighPrioObserver(&observer);
+    search.addObserver(&observer);
     search.run();
 
     CHECK_EQ(observer.path, std::vector<int>{0, 2});
@@ -94,8 +107,8 @@ TEST_CASE("Tabu search builder accepts a configured list") {
     auto moved_search = std::move(builder).build();
     PathObserver copied_observer;
     PathObserver moved_observer;
-    copied_search.addHighPrioObserver(&copied_observer);
-    moved_search.addHighPrioObserver(&moved_observer);
+    copied_search.addObserver(&copied_observer);
+    moved_search.addObserver(&moved_observer);
     copied_search.run();
     moved_search.run();
 
@@ -108,6 +121,24 @@ TEST_CASE("Tabu search builder requires a tabu list") {
     builder.generator(std::make_unique<TestGenerator>()).neighbour(std::make_unique<TestNeighbour>());
 
     CHECK_THROWS_WITH_AS(static_cast<void>(builder.build()), "Tabu list must be set", std::invalid_argument);
+}
+
+TEST_CASE("Tabu search notifies all observers before returning from a zero-iteration run") {
+    auto problem = std::make_shared<TestProblem>();
+    TestGenerator generator;
+    PathObserver observers[3];
+    metah::TabuSearch search(problem, 0, metah::FifoTabuList<int>(2), 4, 1, std::make_unique<TestNeighbour>(),
+                             generator);
+    for (auto &observer : observers) {
+        search.addObserver(&observer);
+    }
+
+    search.run();
+
+    for (const auto &observer : observers) {
+        CHECK_EQ(observer.path, std::vector<int>{0});
+        CHECK_EQ(observer.iterations, std::vector<size_t>{0});
+    }
 }
 
 TEST_SUITE_END();
